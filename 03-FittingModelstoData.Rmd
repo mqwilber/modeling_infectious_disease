@@ -41,8 +41,10 @@ library(MASS)
 Consider the following data on the the number of sick schoolboys confined to bed during an influenza outbreak in a British boarding school (data from British Medical Journal, March 4, 1978).
 
 ```{r}
-# Note this will be different on your own computer
-setwd("~/Dropbox/UCSB/Workshops_and_Meetings/ESA2017_DiseaseModeling/")
+# Note that this might not work on your computers. To set your working directory, try the code below or in Rstudio
+# go to "Session -> Set Working Directory -> Choose Directory..." and select your the `modeling_infectious_disease-master` folder
+# on your Desktop.
+setwd("~/Desktop/modeling_infectious_disease-master/")
 flu = read.csv("boarding_school_flu.csv")
 flu
 ```

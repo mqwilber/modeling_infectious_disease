@@ -4,7 +4,6 @@ author: "Mark Wilber and Cherie Briggs"
 date: "August 6, 2017"
 output:
   html_notebook: default
-  html_document: default
 ---
 
 *Portions of this lesson were adopted from Software Carpentry*
@@ -29,7 +28,7 @@ In this model we have three state variables:
 
 The model looks like this
 
-![](SIR.png)
+![](images/SIR.png)
 
 where the parameters are defined as
 
