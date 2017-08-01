@@ -22,7 +22,7 @@ Welcome to the *Modeling Infectious Disease Dynamics in R* workshop at ESA 2017.
 
 ## Getting started
 
-- To download the lessons and materials for this workshop, go to [github.com/mqwilber/modeling_infectious_disease](github.com/mqwilber/modeling_infectious_disease) and click the green "Clone or download"" button.
+- To download the lessons and materials for this workshop, go to [https://github.com/mqwilber/modeling_infectious_disease](https://github.com/mqwilber/modeling_infectious_disease) and click the green "Clone or download"" button.
 
 ![](images/download.png)
 
