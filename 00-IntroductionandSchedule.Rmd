@@ -9,6 +9,13 @@ Welcome to the *Modeling Infectious Disease Dynamics in R* workshop at ESA 2017.
 
 **Where are we from?**: Department of Ecology, Evolution, and Marine Biology at University of California, Santa Barbara
 
+# Goals
+
+1. Conceptualize and write down systems of dynamical equations describing epidemiological systems
+2. Simulate and analyze these systems of equations
+3. Parameterize the dynamical, epidemiological models from data 
+
+
 # Schedule
 
 | **Topic** | **Time**  |
