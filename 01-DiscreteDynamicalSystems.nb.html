@@ -244,17 +244,10 @@ R_{t + \Delta t} &amp;= R_t + \gamma I_t \Delta t
 </blockquote>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuIyBISURFIE1FIElGIFlPVSBET04nVCBXQU5UIFRPIFNFRSBUSEUgQU5TV0VSXG5TMCA9IDk5ICMgSW5pdGlhbCBudW1iZXIgb2Ygc3VzY2VwdGlibGVzXG5gYGAifQ== -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuIyBISURFIE1FIElGIFlPVSBET04nVCBXQU5UIFRPIFNFRSBUSEUgQU5TV0VSXG5TMCA9IDk5ICMgSW5pdGlhbCBudW1iZXIgb2Ygc3VzY2VwdGlibGVzXG5JMCA9IDEgIyBJbml0aWFsIG51bWJlciBvZiBpbmZlY3RlZHNcblIwID0gMCAjIEluaXRpYWwgbnVtYmVyIG9mIHJlY292ZXJlZFxuYmV0YSA9IDAuMSAjIHBlciBpbmZlY3RlZHMgcGVyIHdlZWtcbmdhbW1hID0gMSAjIHBlciB3ZWVrXG5kZWx0YXQgPSAwLjAwMSAjIHdlZWtzXG5gYGAifQ== -->
 <pre class="r"><code># HIDE ME IF YOU DON'T WANT TO SEE THE ANSWER
-S0 = 99 # Initial number of susceptibles</code></pre>
-<!-- rnb-source-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiV2FybmluZyBtZXNzYWdlOlxuSW4gc2NhbihmaWxlLCB3aGF0LCBubWF4LCBzZXAsIGRlYywgcXVvdGUsIHNraXAsIG5saW5lcywgbmEuc3RyaW5ncywgIDpcbiAgRU9GIHdpdGhpbiBxdW90ZWQgc3RyaW5nXG4ifQ== -->
-<pre><code>Warning message:
-In scan(file, what, nmax, sep, dec, quote, skip, nlines, na.strings,  :
-  EOF within quoted string</code></pre>
-<!-- rnb-output-end -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuSTAgPSAxICMgSW5pdGlhbCBudW1iZXIgb2YgaW5mZWN0ZWRzXG5SMCA9IDAgIyBJbml0aWFsIG51bWJlciBvZiByZWNvdmVyZWRcbmJldGEgPSAwLjEgIyBwZXIgaW5mZWN0ZWRzIHBlciB3ZWVrXG5nYW1tYSA9IDEgIyBwZXIgd2Vla1xuZGVsdGF0ID0gMC4wMDEgIyB3ZWVrc1xuYGBgIn0= -->
-<pre class="r"><code>I0 = 1 # Initial number of infecteds
+S0 = 99 # Initial number of susceptibles
+I0 = 1 # Initial number of infecteds
 R0 = 0 # Initial number of recovered
 beta = 0.1 # per infecteds per week
 gamma = 1 # per week
