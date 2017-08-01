@@ -22,9 +22,11 @@ Welcome to the *Modeling Infectious Disease Dynamics in R* workshop at ESA 2017.
 
 ## Getting started
 
-- To download the lessons and materials for this workshop, go to [https://github.com/mqwilber/modeling_infectious_disease](https://github.com/mqwilber/modeling_infectious_disease) and click the green "Clone or download"" button.
+- To download the lessons and materials for this workshop, go to [https://github.com/mqwilber/modeling_infectious_disease](https://github.com/mqwilber/modeling_infectious_disease), click the green "Clone or download"" button and click "Download as ZIP"
 
 ![](images/download.png)
+
+---
 
 - Unzip the downloaded folder `modeling_infectious_disease-master` and place it on your Desktop.
 - Open up a blank R script in R studio.  You will be actively typing code into this script as we go through the workshop.
