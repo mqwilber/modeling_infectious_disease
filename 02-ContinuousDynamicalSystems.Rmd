@@ -1,0 +1,585 @@
+---
+title: "Solving Ordinary Differential Equations (ODEs) in R"
+author: "Mark Wilber and Cherie Briggs"
+date: "August 6, 2017"
+output:
+  html_notebook: default
+  html_document: default
+---
+
+
+## Numerical solutions to continuous-time systems, Ordinary Differential Equations (ODEs)
+
+At the end of the last section, we found that we could write our own program to approximate the solutions to ordinary differential equations using Euler's method. The Euler method is one of a number of numerical methods for solving ODEs, and it is the simplest method. A number of other methods have been devised to improve the speed and/or accuracy of numerical solultions to ODEs.  Many of these methods use "adaptive time steps", that take very small time steps when the state variables are changing rapidly and larger time steps when the state variables are changing slowly. R has a number of built-in functions for solving systems of ODEs using many of these methods.  We will start by using the `lsoda` function from the R package, deSolve, to do this. 
+
+If you look up `lsoda` in the manual it says that it solves "initial value problems for stiff or non-stiff systems of first-order ordinary differential equations (ODEs)." 
+
+What does that mean??
+
+"initial value problem" means that you are supplying the state of the system at some point in time (e.g. the initial conditions at time t=0).
+
+"stiff or non-stiff systems" is apparently harder to define.  The Wikipedia definition of a "stiff equation" is: "In mathematics, a stiff equation is a differential equation for which certain numerical methods for solving the equation are numerically unstable, unless the step size is taken to be extremely small. It has proven difficult to formulate a precise definition of stiffness, but the main idea is that the equation includes some terms that can lead to rapid variation in the solution."
+`lsoda` decides whether or not your system of equations is "stiff", and switches automatically between stiff and non-stiff methods, so you don't have to worry about it.
+
+"systems of first-order ODEs" means that we have any number of equations that include only first derivatives, e.g. $\frac{d S}{dt} = ...$
+
+
+The first thing you need to do is install and load the deSolve package:
+
+```{r}
+install.packages("deSolve")
+library(deSolve)
+```
+
+There are two steps involved in obtaining numerical solutions to differential equations:
+
+1. Write a function `func` (this function can be named anything that you want), that calculates the right hand side of the differential equations. `func` must take as its first three arguments the current time (`t`), the current values of the state variables (`y`), and a vector containing the parameter values. It must also return a list (using `list(item1, item2, item3)`) whose elements the right hand sides of the ODEs.
+
+2. Use `lsoda` to solve the system of ODEs. lsoda's main arguments are the starting values (y), the times at which you want to compute the values of the variables you are interested in (times), the derivative function (func), and some parameters (parms).
+
+lsoda(initial_values, times, function, parameters)
+
+## Simulating a continuous-time SIR model in R
+
+Let's use `lsoda` to solve the simple continuous-time SIR model:
+This model has three state variables:
+$S$: the density of susceptible (uninfected) individuals
+$I$: the density of infected individuals
+$R$: the density of recovered individuals, who are now resistant to further infection
+
+And, it has 2 parameters:
+$\beta$: Transmission parameter (units = infecteds$^{-1}$time$^{-1}$)
+$\gamma$: Recovery rate (units = time$^{-1}$)
+
+The system of first-order ODEs that describes the rate of change of the 3 state variables are:
+$$
+\begin{align}
+\frac{d S}{dt}  &= -\beta I S \\
+\frac{d I}{dt} &= \beta I S  - \gamma I \\
+\frac{d R}{dt} &= \gamma I
+\end{align}
+$$
+
+1. The first step is to write a function that takes as input the current time $t$, the current values of the 3 state variables, and the parameter values, and returns the right hand side of the 3 ordinary differential equations.  That is, this function returns the rate of change of the 3 state variables.  
+
+
+```{r}
+SIR.model <- function (t, x, params) {
+  S = x[1]
+  I = x[2]
+  R = x[3]
+  beta = params[1]
+  gamma = params[2]
+  
+  dSdt = -beta*S*I
+  dIdt = beta*S*I-gamma*I
+  dRdt = gamma*I
+  
+ return(list(c(dSdt,dIdt,dRdt)))
+}
+```
+
+This function takes three inputs:
+
+$t$: time
+
+$x$: vector with the values of the state variables
+
+$params$: vector with the values of the parameters 
+
+The first part of this function is really just to make it readable to us.  The first 3 lines specify that within this function we are going to define $S$ as the first term in the vector of state variables, $I$ as the second term, and $R$ as the third term. Similarly, the next 2 lines specify that within this function we are going to define $\beta$ as the first term in the vector of parameters, and $\gamma$ as the second term. 
+We could have written the ODEs just in terms of $x[1]$, $params[1]$, etc, but that would make the code a lot more difficult to read!
+```{r}
+  S = x[1]
+  I = x[2]
+  R = x[3]
+  beta = params[1]
+  gamma = params[2]
+```
+
+The second part of the `SIR.model` function defines the ordinary differential equations that describe how the state variables change through time, and packs the results into a "list" to export the results:
+
+```{r}
+  dSdt = -beta*S*I
+  dIdt = beta*S*I-gamma*I
+  dRdt = gamma*I
+  return(list(c(dSdt,dIdt,dRdt)))
+```
+
+The `lsoda` function will call our user-defined `SIR.model` function over and over again to calculate the numerical solution to this system of ODEs.
+
+Although we don't usually have a reason to do this, we could call the `SIR.model` function by first specifying a value for time, a vector for the current value of the state variables, and values of the parameters: 
+```{r}
+
+current_time=5
+current_state=c(1,2,3)
+my_parameters=c(0.1,2)
+
+SIR.model(current_time,current_state,my_parameters)
+```
+It should return a list that gives the rate of change of the 3 state variables.  For these made-up conditions, $S$ is decreasing, $I$ is decreasing, and $R$ is increasing.
+
+---
+2. The second step is to use `lsoda` to solve the system of ODEs.
+
+As we mention above, we call `lsoda` using the code:
+
+`lsoda(initial_values, times, function, parameters)`
+
+Let's use the same initial values that we used in the last exercise:
+
+```{r}
+S0 = 99 # Initial number of susceptibles
+I0 = 1 # Initial number of infecteds
+R0 = 0 # Initial number of recovered
+
+initial_values = c(S0,I0,R0)
+```
+
+and the same values for the parameters:
+
+```{r}
+beta = 0.1 # per infecteds per week
+gamma = 1 # per week
+
+parameters = c(beta,gamma)
+```
+
+
+Let's simulate the model for 5 weeks, outputing the data every 0.01 week.  
+Note: we do not need to specify the time step in `lsoda`.  This method uses an adaptive time step, so it is actually using a time step that is changing through time.  This part of the code is just specifying at what intervals you would like to see the results.  
+
+```{r}
+
+times = seq(0, 5, by=0.01)
+
+```
+
+We now have all of the bits that `lsoda` needs to obtain a numerical solution to the ODEs:
+
+```{r}
+
+results = lsoda(initial_values, times, SIR.model, parameters)
+
+```
+
+R has simulated our model for 5 weeks and stored the values in the matrix `results`. The column order is: 1) time, 2) state variable 1 (S), 3) state variable 2 (I), and 4) state variable 3 (R).
+
+```{r}
+
+plot(results[,1], results[,2], type="l", col="red", ylab="host density", xlab="Time (weeks)", main="SIR Model Output", ylim=c(0, 100), lwd=1.25)
+lines(results[,1], results[,3], type="l", col="blue", lwd=1.25)
+lines(results[,1], results[,4], type="l", col="black", lwd=1.25)
+legend("topright", c("S", "I", "R"), col=c("red", "blue", "black"), lty=1)
+
+```
+
+It is often easier to use the output from the ODE solver if you convert it to an R dataframe and label the columns. You can do this by changing these two lines of code:
+
+```{r}
+initial_values = c(S=S0,I=I0,R=R0)
+results = as.data.frame(lsoda(initial_values, times, SIR.model, parameters))
+```
+
+Now you don't have to remember which column of the results contains which state variable:
+```{r}
+head(results)
+```
+
+---
+
+> ### Exercise 1: Explore the effects of changing the initial conditions, and/or the transmission function
+>
+> Try varying the size of the susceptible population.  Is there a threshold population size below which the infected population cannot have a positive growth rate?
+
+> In the version of the model above, we assumed that the transmission rate is density dependent.  That is, the force of infection is proportional to the density of infected individuals in the population, $\beta I$, and the rate loss of susceptible individuals is $\beta I S$.
+
+> We could instead assume that the transmission rate is frequency dependent.  For frequency dependent transmission, the force of infection is proportional to the fraction of infected individuals, $\frac{\beta I}{N}$, where $N = S + I + R$ is the total population size, and the rate of loss of susceptible individuals is $\frac{\beta I S}{N}$.
+
+> Code up the model with frequency-dependent transmission.  Now try varying the size of the susceptible population. In this caes, is there a threshold population size below which the infected population cannot have a positive growth rate?
+
+
+```{r}
+# HIDE ME IF YOU DON'T WANT TO SEE THE ANSWER
+
+SIR.freqdep.model <- function (t, x, params) {
+  S = x[1]
+  I = x[2]
+  R = x[3]
+  beta = params[1]
+  gamma = params[2]
+  
+  N=S+I+R
+  dSdt = -beta*S*I/N
+  dIdt = beta*S*I/N - gamma*I
+  dRdt = gamma*I
+  
+ return(list(c(dSdt,dIdt,dRdt)))
+}
+
+
+S0 = 10 # Initial number of susceptibles
+I0 = 1 # Initial number of infecteds
+R0 = 0 # Initial number of recovered
+initial_values = c(S=S0,I=I0,R=R0)
+
+beta = 0.1 # per infecteds per week
+gamma = 1 # per week
+parameters = c(beta,gamma)
+
+times = seq(0, 5, by=0.01)
+
+results.freqdep = as.data.frame(lsoda(initial_values, times, SIR.freqdep.model, parameters))
+
+plot(results.freqdep$time, results.freqdep$S, type="l", col="red", ylab="host density", xlab="Time (weeks)", main="SIR Model Output", ylim=c(0, S0), lwd=1.25)
+lines(results.freqdep$time, results.freqdep$I, type="l", col="blue", lwd=1.25)
+lines(results.freqdep$time, results.freqdep$R, type="l", col="black", lwd=1.25)
+legend("topright", c("S", "I", "R"), col=c("red", "blue", "black"), lty=1)
+
+
+```
+## Simulating a continuous-time SIR model with host demography
+
+The SIR model that we have used so far simulates a short-term epidemic in a host population.  It does not include births or deaths of hosts. Let's add these to the model in order to explore the long-term host/pathogen dynamics.
+
+Let's assume that the "background" mortality rate for hosts in all classes is $\mu$, and that infected individuals experience an additional disease-induced mortality rate $\alpha$.
+
+And for simplicity, let's assume that there is a constant input of new susceptibles into the population, at rate $\phi$.
+
+Our new model is:
+$$
+\begin{align}
+\frac{d S}{dt}  &= \phi -\beta I S - \mu S \\
+\frac{d I}{dt} &= \beta I S  - \gamma I - (\mu + \alpha) I \\
+\frac{d R}{dt} &= \gamma I - \mu R
+\end{align}
+$$
+
+> ### Exercise 2: Explore the SIR model with host demography.
+>
+> First we write the new function describing this model.
+
+```{r}
+SIR.demog.model <- function (t, x, params) {
+  S = x[1]
+  I = x[2]
+  R = x[3]
+  beta = params[1]
+  gamma = params[2]
+  phi = params[3]
+  mu = params[4]
+  alpha = params[5]
+  
+  N=S+I+R
+  dSdt = phi-beta*S*I - mu*S
+  dIdt = beta*S*I - gamma*I - (mu+alpha)*I
+  dRdt = gamma*I - mu*R
+  
+ return(list(c(dSdt,dIdt,dRdt)))
+}
+```
+
+> Then we use `lsoda` to simulate the model numerically
+
+```{r}
+S0 = 10 # Initial number of susceptibles
+I0 = 1 # Initial number of infecteds
+R0 = 0 # Initial number of recovered
+initial_values = c(S=S0,I=I0,R=R0)
+
+beta = 0.1 # per infecteds per week
+gamma = 1 # per week
+phi = 10
+mu = 0.1
+alpha = 0.2
+
+parameters = c(beta,gamma,phi,m,alpha)
+
+times = seq(0, 100, by=0.01)
+
+results.demog = as.data.frame(lsoda(initial_values, times, SIR.demog.model, parameters))
+
+plot(results.demog$time, results.demog$S, type="l", col="red", ylab="host density", xlab="Time (weeks)", main="SIR Model Output", ylim=c(0, max(results.demog$S+results.demog$I+results.demog$R)), lwd=1.25)
+lines(results.demog$time, results.demog$I, type="l", col="blue", lwd=1.25)
+lines(results.demog$time, results.demog$R, type="l", col="black", lwd=1.25)
+legend("topright", c("S", "I", "R"), col=c("red", "blue", "black"), lty=1)
+
+
+```
+
+> Try varying the value of $phi$.  Depending on the rate of input of new suscetibles, there will either be a short disease outbreak, or the system will reach an equilibrium with the pathogen present.
+
+## Determining equilibrium solutions, analytically and numerically
+In this exercise, we will explore methods for determining the equilibrium values of the state variables for models consisting of systems of ordinary differential equation.  
+
+An equilibrium is a constant solution to a set of differential equations.  The equilibrium is the value of the state variables in a model for which the rates of change of the state variables are equal to zero.  
+
+Mathematically, for the differential equation $\frac{dN}{dt}=f(N) $, the equilibrium value of the state variable $N$, which we will denoted as $N^*$, is the value of $N^*$ for which $f(N^*) = 0$.  (Note: The $^*$ notation isn’t universal; many different conventions are used to specify equilibrium values in the literature).
+
+In this exercise, we will explore 3 different methods for determining the equilibrium solution to 
+models.  
+**1. Simulation**. For specified values of parameters and initial conditions of the state variable, we can simply run the model for a long time period and see if the state variables level off at an equilibrium value.
+
+*Advantages:* It’s easy. We already have the tools to do this. We can attempt this with any model.
+
+*Disadvantages:* (a) It requires specifying the values of all parameters and the initial values of all state variables.  (b) The trajectories of the state variables will level off at an equilibrium value only if the equilibrium is stable. If the equilibrium is unstable, then the long-term solution of the system of differential equations may be exponential growth (or decline), population cycles, or a chaotic trajectory, rather than a point equilibrium. (c) Even if the equilibrium is stable, it can take a long time for population trajectory to settle at the equilibrium (e.g. see Hastings, A. 2004. Transients: the key to long-term ecological understanding? TREE 19(1):39-45). (d) Some models can have multiple equilibria, such that for a particular set of parameters the model may settle at different equilibrium values depending on the initial values of the state variables chosen. This means that simulations may need to be started at a range of values of the state variables to ensure that there is only one equilibrium. 
+
+**2. Analytically.**  For some models, we can write down an analytical expression for $N^*$ by using algebra to solve the equation $f(N^*) = 0$ for $N^*$. 
+
+*Advantages:* We don’t need to specify specific values for the parameters, so we can interpret the effects of changing the values of parameters for all of parameter space.
+
+*Disadvantages:* Sometimes it’s not possible to obtain an explicit, closed-form, solutions to the equation $f(N^*) = 0$.  (Transcendental equations; e.g. $f(N^*)=exp(-N^*) - N*$.  Also, sometimes solving for the equilibrium solutions can require some really messy algebra. 
+
+**3. Numerically.**  We can use one of a number of numerical methods to numerically find the solution N* to the equation $f(N^*) = 0$ for specified values of parameters.
+
+*Advantages:* We can numerically find solutions to equations for which it is not possible to find explicit, closed-form, solutions (e.g. transcendental equations). We can numerically find the equilibrium values, even if the equilibrium is not stable.
+
+*Disadvantages:* This approach requires specifying the values of all parameters. It also requires making an initial guess at the equilibrium solution. If the guess is too far from the actual equilibrium, then the numerical methods may fail to converge on the solution.  If the model has multiple equilibria, then it may not find all equilibrium values (or may require investigating many starting guesses to find all equilibrium values). 
+
+
+## Calculate the equilibrium host density without the disease
+
+What is the equilibrium density for the host population in the absence of the disease?
+
+Without the pathogen present, the entire host population is in the susceptible class, and the rate of change of the population is:
+
+$$
+\begin{align}
+\frac{d S}{dt}  &= \phi - \mu S \\
+\end{align}
+$$
+> ## Exercise 3a: Solving for the equilibrium through simulation ##
+
+>Create an R script that solves this equation using `deSolve`. This requires chosing values for the parameters $\phi$ and $m$, and initial conditions for the state variable $S$. Let $\phi = 10$ and 
+$\mu = 0.1$, with $S(0) = 5$.
+
+You should find that the density of susceptibles increases and then levels off at a density of 100.  
+
+What happens if you run the model starting at $S(0) = 100$? 
+Try it.  You should find that the density of susceptibles remains at a density of 100.
+
+For this set of parameters ($\phi = 10$ and $\mu = 0.1$), 100 is the equilibrium density for the host population in the absence of the pathogen. 
+
+The equilibrium values of the state variables in a model are the values for which the rate of change is equal to zero.  If you start the model with the state variables at the equilibrium, they should remain at the equilibrium.
+
+> ## Exercise 3b: Solving for the equilibrium analytically  ##
+
+For this simple model, we did not need to go through all of this work to determine the equilibrium host density.  We can calculate it with just a little bit of algebra.  All we need to do is replace all of the $S$’s in the right hand side of the differential equation with $S^*$’s, and set the right hand side of the differential equation equal to zero:
+$$
+\begin{align}
+\phi - \mu S^* = 0\\
+\end{align}
+$$
+and solve for the equilibrium, N*:
+$$
+\begin{align}
+S^* = \frac{\phi}{\mu}\\
+\end{align}
+$$
+This is the analytical expression for $S^*$.  We can see that the equilibrium host density increases as the host fecundity increases, and decreases as the #background" host death rate $m$ increases, for all positive values of $\phi$ and $\mu$. 
+
+
+> ## Exercise 3c: Solving for the equilibrium numerically  ##
+
+This approach isn’t really necessary for this simple model, for which we already have an analytical expression for $S^*$, but we’ll illustrate the approach with this model. We will make use of the package `rootSolve` in R to do this. `rootSolve` is a nonlinear root-finding package that has a number of useful functions (“root” is a more formal way to say the “solution” to the equation).  We’ll use these two: 
+`uniroot.all`  solves for all roots of one (nonlinear) equation, and `multiroot`solves for n roots of n (nonlinear) equations. 
+ 
+To do this exercise, you will need to install the R package rootSolve:
+```{r}
+install.packages("rootSolve")
+library("rootSolve")
+```
+
+
+For this example, we will use the function `uniroot.all`, which searches the interval from lower to upper for all roots of a function with respect to its first argument. The function calls uniroot, which is basic R-function (which you could also use for this example). 
+
+To do this, we need to specify the values of the parameters:
+```{r}
+phi = 10
+mu = 0.1
+```
+
+and write a function that returns the right hand side of the differential equations for a given value of $S$ (I called my function `RHS_susceptible` for Right Hand Side of susceptible equation):
+
+```{r}
+RHS_susceptible<- function(S, phi, mu) {
+	phi - mu*S
+}
+```
+We then find the prey equilibrium by calling function uniroot.all, specifying the interval of values of N to search over: uniroot.all(function, interval, …), where in the … we can pass the values of the parameters needed for our function. 
+
+```{r}
+S_equilibrium <- uniroot.all(RHS_susceptible, c(0, 500), phi=phi, mu = mu)
+```
+and we get the correct answer.
+
+In this case I’ve searched over the interval from S = 0 to S = 500.
+
+
+What happens if you search over the interval from S = 0 to S = 10?
+
+We can make a plot showing how the host density changes as a function of the host fecundity, with $\mu$ set equal to 0.1:
+
+```{r}
+mu<-0.1 						
+phi_all<-seq(0,20,0.1)		# use a sequence of values for phi
+
+# set up a vector to store host equilibrium values 
+S_equilibrium<-rep(0,length(phi_all))	
+							
+for (i in 1:length(phi_all)) {  # loop through all values of phi 
+	
+# Calculate the equilibrium value of S for each value of phi
+  
+S_equilibrium[i]  <- 
+	uniroot.all(RHS_susceptible,c(0,500),phi=phi_all[i], mu = mu)
+}
+plot(phi_all,S_equilibrium, type = "l", col="blue", xlab="host fecundity, phi",ylab="Susceptible equilibrium, S*")
+
+```
+
+
+## Calculate the equilibrium of the SIR model with host demography
+
+Now let's add the pathogen back in:
+
+Our new model is:
+$$
+\begin{align}
+\frac{d S}{dt}  &= \phi -\beta I S - \mu S \\
+\frac{d I}{dt} &= \beta I S  - \gamma I - (\mu + \alpha) I \\
+\frac{d R}{dt} &= \gamma I - \mu R
+\end{align}
+$$
+Above we showed that we could calculate the equilibrium through simulation.
+for example, if we use these parameters:
+```{r}
+beta = 0.1 # per infecteds per week
+gamma = 1 # per week
+phi = 10
+mu = 0.1
+alpha = 0.2
+```
+The system reaches an equilibrium with:
+$S^* = 13$,$I^* = 6.6923$, and $R^* = 66.923$.
+
+**Solving for the equilibrium analytically:** To calculate the equilibrium solution for the SIR model we set $S = S*$, $I = I*$, and *R = R*$  and set the right hand side of all 3 differential equations equal to zero.  We then find the solution to the 3 simultaneous equations:
+$$
+\begin{align}
+S^* = \frac{\gamma + \mu + \alpha}{\beta}\\
+I^* = \frac{\phi - \mu S^*}{\beta S^*}\\
+R^* = \frac{\gamma I}{\mu}
+\end{align}
+$$
+Inspecting these equations, we can see that depending on the values of the parameters, it is possible for the equilibrium density of infected to be negative (which really doesn’t make sense).  We can see that the pathogen can persist, with $I^* > 0$ only if $\phi > \mu S^*$.
+
+It’s useful to have an analytical expression for the equilibrium, because we can see how each of the parameters affects the equilibrium, without having to specify the exact values of all of the parameters. 
+
+**Solving for the equilibrium numerically:** Because we now have three equations that we want to solve simultaneously, we will use the R function multiroot from the package rootSolve.  Given a vector of n variables, and a set of n (nonlinear) equations in these variables, multiroot estimates the root of the equations, i.e. the variable values where all function values = 0. multiroot uses the Newton-Raphson root-solving method, which you can look up if you’re interested. 
+
+The syntax for calling multiroot is:
+
+multiroot(f, start, …)
+
+where f is a the function for which the root is sought; it must return a vector with as many values as the length of start. multiroot deals with parameters slightly differently than uniroot.all.  The function is called either as f(x, ...) if parms = NULL or as f(x, parms, ...) if parms is not NULL. 
+start vector containing initial guesses for the unknown x; if start has a name attribute, the names will be used to label the output vector. 
+… specifies additional arguments that you don’t need to include yet, but you may want to look into if you end up using this method a lot.
+
+Here is the R code for our SIR example:
+This function returns a vector with the right hand sides of the ODEs
+```{r}
+RHS_SIR <- function(x, parms) {
+	with(as.list(c(x, parms)),{
+
+      c(F1 = phi-beta*S*I - mu*S,
+        F2 = beta*S*I - gamma*I - (mu+alpha)*I,
+        F3 = gamma*I - mu*R)
+  }) # end with(as.list ...
+}
+
+#specify the values of the parameters
+parameters <- c(beta = 0.1, gamma = 1, phi = 10, mu = 0.1, alpha = 0.2)
+
+#specify the starting guesses for the state variables
+x<-c(S=5,I=5,R=10)
+
+#call multiroot
+eqm<-multiroot(RHS_SIR, x, parms = parameters)
+
+#the equilibrium values are stored in the root part of eqm
+eqm$root
+```
+The result agrees with what we found from our simulation, and from the equilibrium values that we calculated analytically. 
+
+if you just type in eqm, you’ll see that multiroot also gives you other information about how well the numerical root solving routine did (the precision, and the number of iterations the numerical routine took). 
+
+What happens to $S^*$ if you increase the value of the host fecundity $\phi$?  What happens to $I^*$?
+
+## Calculating $R_0$ ##
+
+The pathogen can invade a fully susceptible population when $\frac{dI}{dt} > 0$.
+
+This occurs when:  $S > \frac{\gamma + \mu + \alpha}{\beta}$
+
+This can be rearranged to show that the disease can invade a fully susceptible population (i.e. when all individuals are in the infected class, $S = N$) only when:
+$$
+\begin{align}
+R_0 = \frac{\beta N}{\gamma + \mu + \alpha} > 1
+\end{align}
+$$
+where N is the total population size. 
+
+## Calculating the conditions for pathogen persistence ##
+
+Inspecting the analytical values for the SIR equilibrium, we see that the equilibrium density of infecteds is positive only if:
+$$
+\begin{align}
+I^* = \frac{\phi - \mu S^*}{\beta S^*} > 0 \\
+\end{align}
+$$
+where 
+$$
+\begin{align}
+S^* = \frac{\gamma + \mu + \alpha}{\beta}\\
+\end{align}
+$$
+rearranging, we can see that the pathogen will persist with a positive equilibrium of infecteds only if:
+$$
+\begin{align}
+\frac{\phi}{\mu} > \frac{\gamma + \mu + \alpha}{\beta}\\
+\end{align}
+$$
+
+```{r}
+mu<-0.1 						
+phi_all<-seq(0,20,0.1)		# use a sequence of values for phi
+
+# set up a vector to store host equilibrium values 
+S_equilibrium<-rep(0,length(phi_all))	
+I_equilibrium<-rep(0,length(phi_all))	
+R_equilibrium<-rep(0,length(phi_all))	
+
+x<-c(S=5,I=5,R=10)
+							
+for (i in 1:length(phi_all)) {  # loop through all values of phi 
+	
+#specify the values of the parameters
+parameters <- c(beta = 0.1, gamma = 1, phi = phi_all[i], mu = 0.1, alpha = 0.2)
+
+#specify the starting guesses for the state variables
+
+#call multiroot
+eqm<-multiroot(RHS_SIR, x, parms = parameters)
+  
+S_equilibrium[i]  <- 	eqm$root[[1]]
+I_equilibrium[i]  <- 	eqm$root[[2]]
+R_equilibrium[i]  <- 	eqm$root[[3]]
+}
+
+plot(phi_all,S_equilibrium, type="l", col="red", ylab="Equilibrium densities", xlab="host fecundity, phi", main="SIR Equilibrium densities", ylim=c(0, 50), lwd=1.25)
+lines(phi_all,I_equilibrium, type="l", col="blue", lwd=1.25)
+lines(phi_all,R_equilibrium, type="l", col="black", lwd=1.25)
+legend("topright", c("S*", "I*", "R*"), col=c("red", "blue", "black"), lty=1)
+
+```
+print(S_equilibrium)
