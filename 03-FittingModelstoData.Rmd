@@ -5,7 +5,7 @@ date: "August 6, 2017"
 output: html_notebook
 ---
 
-**Lesson adapted and modified from [the model fitting tutorial at EEID 2012](https://ms.mcmaster.ca/~bolker/eeid/ecology/fitting.pdf) and *Ecological Models and Data in R* (Bolker, 2008) **
+**Lesson adapted and modified from [the model fitting tutorial at EEID 2012](https://ms.mcmaster.ca/~bolker/eeid/ecology/fitting.pdf) and *Ecological Models and Data in R* (Bolker, 2008)**
 
 ---
 
@@ -15,12 +15,6 @@ output: html_notebook
 2. `deSolve`
 3. `bbmle`
 4. `MASS`
-
-You can install these packages using `install.packages`.  For example,
-
-```{r, eval=F}
-install.packages("ggplot2")
-```
 
 ```{r, message=FALSE}
 library(deSolve)
@@ -35,16 +29,16 @@ library(MASS)
 
 1. Understand the difference between process error and measurement error in dynamic models
 2. Learn to fit a model with measurement error to empirical data using least squares and maximum likelihood
+3. Learn to calculate uncertainty around the estimated parameters and statistics in your model
+4. Compare different models fit with maximum likelihood using AIC
 
 ## Motivating example: Flu in the school ain't cool
 
 Consider the following data on the the number of sick schoolboys confined to bed during an influenza outbreak in a British boarding school (data from British Medical Journal, March 4, 1978).
 
 ```{r}
-# Note that this might not work on your computers. To set your working directory, try the code below or in Rstudio
-# go to "Session -> Set Working Directory -> Choose Directory..." and select your the `modeling_infectious_disease-master` folder
-# on your Desktop.
-setwd("~/Desktop/modeling_infectious_disease-master/")
+# Note this will be different on your own computer
+setwd("~/Dropbox/UCSB/Workshops_and_Meetings/ESA2017_DiseaseModeling/")
 flu = read.csv("boarding_school_flu.csv")
 flu
 ```
@@ -72,7 +66,12 @@ One potential model that could generate this type of dynamics is an SIBR model w
 - B: infected boys confined to bed
 - R: recovered boys
 
-We can write down a set of four differential equations describing the SIBR model. Assume that the **force of infection** (i.e. the per capita rate at which a susceptible individual transitions to infected) is equal to $\beta \frac{I}{N}$ where $N$ is the total, fixed population size. The model is then
+We can write down a set of four differential equations describing the SIBR model. Assume that the **force of infection** 
+(i.e. the per capita rate at which a susceptible individual transitions to infected) is equal to $\beta \frac{I}{N}$ where $N$ is the total, 
+fixed population size. Remember from the first lesson that this corresponds to **frequency-dependent transmission** in which we assume that the average number of contacts per individual
+is constant. However, for a host population of a fixed size, **frequency-dependent** and **density-dependent** transmission can be written equivalently (Why? Because total density host density is fixed and, because the number of contacts scale with host density under density-dependent transmission, the number of contacts is also fixed). 
+
+The model is then
 
 $$\begin{align}
  \frac{dS}{dt} &= -\beta\frac{I}{N}S \\
@@ -123,7 +122,7 @@ sibr_model = function(time, state_vars, params){
 
 ## Exercise 2: Compare the SIBR model to data
 
-> Play around with different values of $\beta$, $\gamma$, and $\delta$ in the SIBR model to see if you can make an epidemic curve that looks something like the plot above. Try starting with $\beta = 2$, $\gamma = 1/3$ and $\delta = 1 / 3$. Start with the initial conditions as $S_0 = 762$, $I_0=1$, $B_0 = 0$, $R_0 = 0$.  Remember that the observed datat is describing $B$, the number of boys in bed, so you will want to compare the $B$ trajectory from the model to the observed data.
+> Play around with different values of $\beta$, $\gamma$, and $\delta$ in the SIBR model to see if you can make an epidemic curve that looks something like the plot above. Try starting with $\beta = 2$, $\gamma = 1/3$ and $\delta = 1 / 3$. Start with the initial conditions as $S_0 = 762$, $I_0=1$, $B_0 = 0$, $R_0 = 0$.  Remember that the observed data is describing $B$, the number of boys in bed, so you will want to compare the $B$ trajectory from the model to the observed data.
 
 
 ```{r}
@@ -131,13 +130,14 @@ sibr_model = function(time, state_vars, params){
 # library(deSolve)
 
 # Set parameters and initial conditions
-params = c(beta=2.3, gamma=0.4, delta=1/3)
+params = c(beta=2.3, gamma=0.8, delta=0.4)
 xinit = c(S=762, I=1, B=0, R=0)
 
 # Set times at which we want to solve ODE
 times = seq(0, 15, by=1/4)
 
-# Run ODE model
+# Run ODE model. Note that `ode` is generic wrapper for `lsoda` with the same parameters. By default `ode`
+# uses the `lsoda` solver, but you can specify other solvers using the `method` argument.
 ode_res = as.data.frame(ode(xinit, times, sibr_model, params))
 ```
 
@@ -152,10 +152,10 @@ ggplot(ode_res, aes(x=time, y=I, color="I")) +
     xlab("Days") + ylab("Number of hosts")
 
 # Or base plot
-plot(ode_res$time, ode_res$I, col="blue", type="l", ylab="Number of hosts", xlab="Days")
+plot(ode_res$time, ode_res$I, col="blue", type="l", ylab="Number of hosts", xlab="Days", ylim=c(0, 500))
 lines(ode_res$time, ode_res$B, col="red")
 lines(flu$day, flu$flu, col="green")
-legend(10, 350, legend=c("I", "B", "data"), fill=c("blue", "red", "green"))
+legend("topright", legend=c("I", "B", "data"), fill=c("blue", "red", "green"))
 ```
 
 ## Fitting the SIBR model to data with trajectory matching
@@ -167,7 +167,7 @@ This is an incredibly important question and one we will discuss in the followin
 
 ### Process error vs. measurement error
 
-Following Bolker (2008, Chapter 11 in [Ecological Models and Data in R](https://ms.mcmaster.ca/~bolker/emdbook/chap11A.pdf)), let's consider a simple discerete time model given by
+Following Bolker (2008, Chapter 11 in [Ecological Models and Data in R](https://ms.mcmaster.ca/~bolker/emdbook/chap11A.pdf)), let's consider a simple discrete time model given by
 
 $$X_t = a + b X_{t - 1}$$
 
@@ -237,7 +237,7 @@ lines(time, X_obs, col="red")
 
 ```
 
-In constrast, pure **process error** assumes that the stochasticity (i.e. randomness of some type) is part of the process and observations are made without error. Assuming normally distributed, white noise process error this would look like
+In contrast, pure **process error** assumes that the stochasticity (i.e. randomness of some type) is part of the process and observations are made without error. Assuming normally distributed, white noise process error this would look like
 
 $$\begin{align}
   X_t &= a + b X_{t - 1} + Z_t \\
@@ -277,9 +277,9 @@ lines(time, X_det, col="black")
 lines(time, X_obs, col="red")
 ```
 
-Notice that the model with process error looks qualitatively very different than the model with measurement error.  This is because now there is autocorrelation between the process error at time $t$ and the model output at time $t + h$ (for $h \geq 0$).
+Notice that the model with process error looks qualitatively very different than the model with measurement error.  This is because now there is auto-correlation between the process error at time $t$ and the model output at time $t + h$ (for $h \geq 0$).
 
-Depending on the type of error, we will need different methods for fitting the model. And if there are both types of error, which happens quite frequently, things get even more complicated (for example, [here are some cutting-edge tools](http://kingaa.github.io/pomp/docs.html) for this situtation)!  Today we will just consider fitting models with *measurement error*. 
+Depending on the type of error, we will need different methods for fitting the model. And if there are both types of error, which happens quite frequently, things get even more complicated (for example, [here are some cutting-edge tools](http://kingaa.github.io/pomp/docs.html) for this situation)!  Today we will just consider fitting models with *measurement error*. 
 
 ### Trajectory matching and least squares
 
@@ -444,11 +444,11 @@ As we'd expect given measurement error, the fit is not perfect, but minimizing S
 
 One of the multiple reasons that SSE is often used to estimate parameters is because it provides equivalent parameter estimates as assuming that our measurement error is normally (Gaussian) distributed.  However, sum of squared errors estimation in and of itself does not provide us with a way to get confidence intervals around our predictions. Confidence intervals are useful if we wanted to, say, calculate the uncertainty around the predicted $R_0$ in our model.  To do this, we need to allow the measurement error to follow some distribution (e.g. Normal, Poisson, Binomial, etc.). 
 
-Sepcifying a distribution for our measurement error allows us to use **maximum likelihood** to fit the model. Likelihood is defined as the *the likelihood of a set of parameters given the data*.  Similar to using SSE, we can say that a parameter set is "better" if it has a higher likelihood than another parameter set, given the data.  We can find the the "best" parameter set for our data by finding the parameter set that **maximizes the likelihood given the data**.
+Specifying a distribution for our measurement error allows us to use **maximum likelihood** to fit the model. Likelihood is defined as the *the likelihood of a set of parameters given the data*.  Similar to using SSE, we can say that a parameter set is "better" if it has a higher likelihood than another parameter set, given the data.  We can find the the "best" parameter set for our data by finding the parameter set that **maximizes the likelihood given the data**.
 
 Ok, but how do we use likelihood?  A couple of definitions are helpful. 
 
-Given a parameter vetor $\Theta$ (think, for example, $\Theta = [\beta, \gamma, \delta]$) and some data vector $Y = y_1, y_2, \dots, y_t$ the likelihood ($L$) is defined as
+Given a parameter vector $\Theta$ (think, for example, $\Theta = [\beta, \gamma, \delta]$) and some data vector $Y = y_1, y_2, \dots, y_t$ the likelihood ($L$) is defined as
 
 $$L(\Theta | Y) = p(Y | \Theta)$$
 
@@ -489,7 +489,7 @@ likelihood = prod(dnorm(data, mean=mu, sd=sigma))
 likelihood
 ```
 
-Notice that this number is really, really small. That is ok. However, it is almost always more convenient to work with the negative log-likelihood.  Take the negative log of each side of the likelihood equation, use some nice log rules, and you get
+Notice that this number is really, really small. That is ok. However, it is almost always more convenient and numerically more stable to work with the negative log-likelihood.  Take the negative log of each side of the likelihood equation, use some nice log rules, and you get
 
 $$-\log(L(\Theta | Y)) = -\sum_{t = 1}^n \log(p(y_t | \Theta))$$
 
@@ -535,7 +535,7 @@ As we'd expect, the $\mu$ value with the smallest negative log-likelihood give t
 
 ## Likelihood in practice: Application to the influenza data
 
-Let's try using these likelihood concepts on the influenza data.  Let's assume that sick boys in bed are actually counted sloppily such that they are under or over-reported. We will assume that the way in which sick boys in bed are mis-counted follows a Poisson distribution.  A Poisson distribution is a often-used distribution for count data. It is defined by one parameter $\lambda$ and mean = variance = $\lambda$. In a more rigorous analysis, the assumption of Poisson measurement error is an assumption that we would need to test. 
+Let's try using these likelihood concepts on the influenza data.  Let's assume that sick boys in bed are actually counted sloppily such that they are under or over-reported. We will assume that the way in which sick boys in bed are miscounted follows a Poisson distribution.  A Poisson distribution is a often-used distribution for count data. It is defined by one parameter $\lambda$ and mean = variance = $\lambda$. In a more rigorous analysis, the assumption of Poisson measurement error is an assumption that we would need to test. 
 
 Consider the following measurement error model where SIBR$_{\text{B}, t | \beta, \gamma, \delta}$ is the SIBR model prediction for the number of boys confined to bed ($B$) at time $t$ given the parameters $\beta, \gamma, \delta$. 
 
@@ -681,7 +681,7 @@ fit_gamma
 
 We just found the MLE of $\beta$ conditional on fixed values of other parameters. What if we want to jointly maximize the likelihood for all parameters simultaneously? Theoretically, this is no problem given enough data. Realistically, it can sometimes be quite challenging and there is a lot of research on the best ways to do this. While it is beyond the scope of our discussion here, keep in mind that simultaneously estimating multiple parameters can be challenging depending on how informative your data is.
 
-To fit mulitple parameters simultaneously, we could again use `optim`. However, the `mle2` function in the `bbmle` package provides some nice additional features that we will use later.
+To fit multiple parameters simultaneously, we could again use `optim`. However, the `mle2` function in the `bbmle` package provides some nice additional features that we will use later.
 
 ```{r}
 library(bbmle)
@@ -700,7 +700,7 @@ The arguments are a bit different here.
 
 (1) `sibr_nll`: This is the negative log-likelihood function that we want to minimize
 (2) `start`: This is a list where the named items correspond to parameters in our `sibr_nll` function.  These are starting values for each of the parameters we want to estimate using MLE.  You want to try to choose starting values that are at least somewhat close to the MLE estimates, otherwise the optimizer will really struggle to find the MLE estimates.
-(3) `method`: This specifies the minimization routine to use.  In this case we are using "L-BFGS-B", which is an optimizer thar requires a lower and upper bound.
+(3) `method`: This specifies the minimization routine to use.  In this case we are using "L-BFGS-B", which is an optimizer that requires a lower and upper bound.
 (4) `lower` and 'upper`: Vectors that specify the lower and upper bounds for the parameters you are estimating.
 
 We can look at the coefficient estimates and we can see that they are not all that different from our least squares estimates.
@@ -709,6 +709,13 @@ We can look at the coefficient estimates and we can see that they are not all th
 coef(fit_all)
 best_params_lsq
 ```
+
+```{r}
+sibr_sim = as.data.frame(ode(y=init_vals, parms=fit_all@coef, time=times, func=sibr_model))
+ggplot(sibr_sim, aes(x=time, y=B, color="SIBR")) + 
+              geom_line() + geom_line(data=flu, aes(x=day, y=flu, color="data"))
+```
+
 
 The real advantage is now we can get confidence intervals for these parameters
 
@@ -730,7 +737,7 @@ R0 = as.numeric(fit_all@coef['beta'] / fit_all@coef['gamma'])
 print(R0)
 ```
 
-What is the uncertainty around this estimate? Well`fit_all` provides us with a covariance matrix for our parameters of interest.
+What is the uncertainty around this estimate? Well`fit_all` provides us with a co-variance matrix for our parameters of interest.
 
 ```{r}
 covar = fit_all@vcov
@@ -741,11 +748,11 @@ S = diag(sqrt(diag(covar)))
 solve(S) %*% fit_all@vcov %*% solve(S)
 ```
 
-With this covariance matrix, we could either use something called the [delta method](http://www.math.umt.edu/patterson/Delta.pdf) to get the uncertainty around $R_0$ or, my personal favorite, brute force simulation.  
+With this co-variance matrix, we could either use something called the [delta method](http://www.math.umt.edu/patterson/Delta.pdf) to get the uncertainty around $R_0$ or, my personal favorite, brute force simulation.  
 
 The brute force simulation approach follows four steps
 
-1. Assume that the parameter estimates follow a multivariate Normal distribution with the mean being the MLE parameter estimates and the covariance matrix being the estimated covariance matrix. This is asymptotically true for all MLE estimates as sample size gets large so it is not that crazy of an assumption.
+1. Assume that the parameter estimates follow a multivariate Normal distribution with the mean being the MLE parameter estimates and the co-variance matrix being the estimated co-variance matrix. This is asymptotically true for all MLE estimates as sample size gets large so it is not that crazy of an assumption.
 2. Draw a large number of parameter vectors from this multivariate distribution.
 3. Calculate the statistic of interest ($R_0$ in our case) for all random draws.  This gives you a distribution of the statistic.
 4. Compute the your desired quantiles from this distribution.
@@ -766,4 +773,98 @@ quantile(R0_distribution, c(0.025, 0.5, 0.975))
 
 ```
 
-Doesn't look like there is much doubt that, given our estimated parameters, $R_0 > 1$. 
+Doesn't look like there is much doubt that, **given our estimated parameters and our assumed model**, $R_0 > 1$.
+
+## Comparing models fit with maximum likelihood
+
+A benefit of using maximum likelihood to fit your models, is that there are well-established ways for comparing different models. One way of comparing models is using the Akaike information criterion (AIC) which is defined as
+
+$$AIC = -2\ln(L(\theta_{MLE} | Y)) + 2k$$
+
+where $\theta_{MLE}$ are the maximum likelihood estimate parameters given the data and $k$ is the number of parameters that were fit.  The first term in the AIC equation is two times the negative log-likelihood of the model under the MLE parameters and this is measures how well the model fits the data.  However, because more complex models almost always fit the data better, the second term in the model penalizes more complex models.  Therefore, the AIC is trying to find a balance between models that fit the data well and models that are relatively simple.  This is the well-known bias-variance trade-off that is often discussed in statistics.  When comparing a set of models, **the model with the lowest AIC is the perferred model**.
+
+We could calculate the AIC for our best fit model with the following code
+
+```{r}
+nll = fit_all@min
+k = 3
+AIC = 2*nll + 2*k
+print(AIC)
+```
+
+or by using the `AIC` function in R
+
+```{r}
+AIC(fit_all)
+```
+
+Of course, a single AIC value doesn't mean anything.  So we want another model to compare it to. 
+
+> ### Exercise: Compare an SIR to the SIBR model
+>
+> 1. Code up an SIR model in which the measurement error follows a Poisson distribution.
+> 2. Assume that the boys confined to bed corresponds to the infected class of the SIR model and fit the model using maximum likelihood.
+> 3. Compute the AIC of the SIR model and compare it to the SIRB model.  Which model does AIC indicate is preferable? 
+> 4. Compute $R_0$ for the SIR model. Did your estimate for $R_0$ change (see Wearing et al. 2005, Plos Medicine)?
+
+
+```{r}
+# HIDE ME IF YOU DON'T WANT TO SEE THE ANSWER
+
+SIR.model <- function (t, x, params) {
+  # SIR model
+  
+  S = x[1]
+  I = x[2]
+  R = x[3]
+  beta = params[1]
+  gamma = params[2]
+  N = 763
+  
+  dSdt = -beta*S*I/N
+  dIdt = beta*S*I/N - gamma*I
+  dRdt = gamma*I
+  
+ return(list(c(dSdt,dIdt,dRdt)))
+}
+
+
+sir_nll = function(beta, gamma){
+  
+  # Setting initial conditions and parameters just like before
+  times = c(0, flu$day)
+  params = c(beta, gamma)
+  init_vals = c(S=762, I=1, R=0)
+  ode_res = as.data.frame(ode(func=SIR.model, 
+                                y=init_vals, 
+                                times=times,
+                                parms=params))
+  # Removing the initial condition
+  nll = -1*sum(dpois(flu$flu, ode_res$I[2:15], log=TRUE))
+  return(nll)
+  
+}
+
+# Get the mle estimates for my parameters
+fit_all_sir = mle2(sir_nll, 
+               start=list(beta=start_params[1],
+                          gamma=start_params[2]),
+               method="L-BFGS-B",
+               lower=c(0, 0),
+               upper=c(Inf, Inf))
+
+# Look at coefficients
+print(fit_all_sir@coef)
+print(c(R0=as.numeric(fit_all_sir@coef['beta']) / as.numeric(fit_all_sir@coef['gamma'])))
+
+# Plot the results comparing the various trajectories
+sir_sim = as.data.frame(ode(y=c(S=762, I=1, R=0), times = times, func=SIR.model, parms = fit_all_sir@coef))
+
+ggplot(data=sir_sim, aes(x=time, y=I, color="SIR (Poisson)")) + geom_line() + 
+    geom_line(data=flu, aes(x=day, y=flu, color="Data")) + 
+    geom_line(data=sibr_sim, aes(x=time, y=B, color="SIBR (Poisson)")) + 
+    geom_line(data=best_mod_lsq, aes(x=time, y=B, color="Least Squares"))
+
+# Compare SIR and SIBR models with AIC
+AIC(fit_all_sir, fit_all)
+```
