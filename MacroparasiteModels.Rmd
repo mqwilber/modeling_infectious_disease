@@ -11,7 +11,7 @@ output: html_notebook
 
 ---
 
-The packages you will need for this lessons are
+The packages you will need for this lesson are
 
 1. `rootSolve`
 2. `numDeriv`
